@@ -1,6 +1,7 @@
-from src.pointnet.train import train
-from src.pointnet.eval import evaluate
 import argparse
+
+from src.pointnet.eval import evaluate
+from src.pointnet.train import train
 
 
 def get_args():

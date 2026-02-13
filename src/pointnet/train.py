@@ -1,12 +1,12 @@
-import os
 import json
-import numpy as np
+import os
 from pathlib import Path
-from tqdm import tqdm
 
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
 
 from .model import PointNetSeg
 

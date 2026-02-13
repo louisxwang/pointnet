@@ -1,7 +1,8 @@
-import os
 import json
-import numpy as np
+import os
 from pathlib import Path
+
+import numpy as np
 import torch
 from sklearn.neighbors import NearestNeighbors
 
