@@ -1,3 +1,10 @@
+"""
+This is the main entry point for training and testing the PointNet model.
+It parses command line arguments to determine whether to run training or testing,
+and then calls the appropriate functions in src/pointnet/train.py and src/pointnet/eval.py
+For details on the arguments and their usage, run `python main.py --help`
+"""
+
 import argparse
 
 from src.pointnet.eval import evaluate

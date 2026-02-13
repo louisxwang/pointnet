@@ -1,4 +1,6 @@
 
+#### This is a simplified implementation of the PointNet for 3D point cloud segmentation demo.
+
 # Setup
 
 ### Option 1 Using uv

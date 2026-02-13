@@ -1,3 +1,16 @@
+"""
+This is a simple implementation of PointNet for point cloud segmentation.
+The model uses only XYZ coordinates as the RGB information is tightly coupled with the tags
+in the dataset and may not generalize well. 
+The input to the model is a point cloud of shape (B, N, 3), where B is the batch size, 
+N is the number of points, and 3 corresponds to the XYZ coordinates. 
+The output is a per-point class score of shape (B, N, num_classes). 
+
+Simplification
+The model used Conv1D layers to replace the shared MLP as mentioned in the orginal paper.
+The rotation T-nets are not implemented as the dataset is already aligned and the model can 
+learn to be invariant to rotations through data augmentation.
+"""
 import torch
 import torch.nn as nn
 

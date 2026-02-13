@@ -17,6 +17,18 @@ from .model import PointNetSeg
 class SceneDataset(Dataset):
     def __init__(self, root, split, num_points=4096, samples_per_scene=64, 
                  normalize=False, use_sampling_cube=False):
+        """
+        Dataset for loading point cloud scenes and providing random samples for training/validation
+        Params
+            root: folder containing scene_0x.npz files and splits.json
+            split: "train" or "val", determines which scenes to load based on splits.json
+            num_points: how many points to sample for each training example == model input size
+            samples_per_scene: how many set of random samples to generate from each scene file,
+                    this helps with data augmentation and training stability
+            normalize: whether to center and scale the point clouds, helps with training stability
+            use_sampling_cube: whether to sample points from a random cube region (instead of whole scene), 
+                    helps with model generalization and reduces memory usage
+        """
         self.root = Path(root).resolve()
         self.num_points = num_points
         self.use_sampling_cube = use_sampling_cube  # sample inside a random cube region
@@ -57,7 +69,7 @@ class SceneDataset(Dataset):
         xyz = data["xyz"]          # (N,3)
         labels = data["labels"]    # (N,)
 
-        # Random sampling from a cube volume
+        # Random sample points inside a cube volume (experimental) or from the whole scene
         block_points = [] if self.use_sampling_cube else xyz
         block_labels = [] if self.use_sampling_cube else labels
         while len(block_points) < self.num_points:
@@ -116,7 +128,19 @@ def train(
     lr = 1e-3,
     use_sampling_cube=False
 ):
-
+    """Train the PointNet segmentation model on the provided dataset
+    Params
+        data_dir: folder containing scene_0x.npz files and splits.json
+        artifact_dir: folder to save model checkpoints and training logs
+        batch_size: how many samples to process in each training step, adjust based on GPU memory
+        num_points: how many points to sample from each scene for training, should match model input size
+        epochs: how many times to loop through the entire training dataset
+        lr: learning rate for the optimizer, adjust based on training stability
+        use_sampling_cube: whether to sample points from a random cube region (instead of whole scene), 
+            helps with model generalization and reduces memory usage
+    Returns
+        None (saves model checkpoints to artifact_dir)
+    """
     os.makedirs(artifact_dir, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

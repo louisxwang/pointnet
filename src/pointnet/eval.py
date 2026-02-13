@@ -153,8 +153,16 @@ def batch_inference(
     device,
 ):
     """
-    block_buffer: list of (4096,3)
-    index_buffer: list of (4096,)
+    Helper function to perform batched inference and vote accumulation
+    Params
+        model: the PointNet model used for inference
+        block_buffer: list of (4096,3)
+        index_buffer: list of (4096,)
+        vote_logits: (N,C) accumulated logits for each point
+        vote_counts: (N) how many times each point has been voted on
+        device: torch.device instance, determines if GPU is used
+    Returns
+        None (modifies vote_logits and vote_counts in place)
     """
 
     batch_points = torch.from_numpy(
@@ -271,7 +279,17 @@ def sliding_window_inference(
 # Metrics
 # --------------------------------------------------
 def compute_metrics(preds, labels, num_classes):
-
+    """
+    Compute overall accuracy, mean class accuracy and mean IoU
+    Params
+        preds: (N,) predicted class labels for each point
+        labels: (N,) ground truth class labels for each point
+        num_classes: number of classes in the dataset
+    Returns
+        overall_acc: overall accuracy across all points
+        mean_class_acc: mean accuracy across all classes
+        mean_iou: mean IoU across all classes
+    """
     overall_acc = (preds == labels).sum() / len(labels)
 
     class_acc = []
@@ -308,7 +326,15 @@ def evaluate(
     visualize=True,
     use_sampling_cube = False
 ):
-
+    """
+    Evaluate the model on the test set and print metrics, optionally visualize results
+    Params
+        data_dir: folder containing scene_0x.npz and splits.json
+        checkpoint_path: path to the trained model checkpoint
+        num_classes: how many classes does the model support
+        visualize: whether to visualize predictions vs ground truth
+        use_sampling_cube: whether to use sliding window inference or whole scene inference
+    """     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
 
