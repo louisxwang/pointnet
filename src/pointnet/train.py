@@ -15,9 +15,11 @@ from model import PointNetSeg
 # Dataset
 # -------------------------------------------------
 class SceneDataset(Dataset):
-    def __init__(self, root, split, num_points=4096, samples_per_scene=64, normalize=False):
+    def __init__(self, root, split, num_points=4096, samples_per_scene=64, 
+                 normalize=False, use_sampling_cube=False):
         self.root = Path(root).resolve()
         self.num_points = num_points
+        self.use_sampling_cube = use_sampling_cube  # sample inside a random cube region
 
         with open(self.root / "splits.json") as f:
             splits = json.load(f)
@@ -36,9 +38,9 @@ class SceneDataset(Dataset):
                 xyz = xyz / (np.max(np.linalg.norm(xyz, axis=1))+ 1e-6)
                 self.scenes.append({"xyz":xyz, "labels":data["labels"]})
                 self.sampling_cube_size = 0.5  # Random sampling from a cube volume
-        else: # Normalization is not needed as all files are within [-5, 5] for x,y and [0, 2] for z
+        else: # Normalization desactived as all files are within [-5, 5] for x,y and [0, 2] for z
             self.scenes = [np.load(f) for f in self.files]
-            self.sampling_cube_size = 2  # adjust to your scene scale
+            self.sampling_cube_size = 2
 
         # Multiple sampels from each file
         self.index_map = []
@@ -56,7 +58,8 @@ class SceneDataset(Dataset):
         labels = data["labels"]    # (N,)
 
         # Random sampling from a cube volume
-        block_points = []
+        block_points = [] if self.use_sampling_cube else xyz
+        block_labels = [] if self.use_sampling_cube else labels
         while len(block_points) < self.num_points:
             # Pick random point as cube center
             center_idx = np.random.choice(len(xyz))
@@ -104,13 +107,15 @@ class SceneDataset(Dataset):
 # Training
 # -------------------------------------------------
 
-def train():
-    data_dir = "./data/input"
-    artifact_dir = "./artifacts"
-    batch_size = 32
-    num_points = 4096
-    epochs = 100
-    lr = 1e-3
+def train(
+    data_dir = "./data/input",
+    artifact_dir = "./artifacts",
+    batch_size = 32,
+    num_points = 4096,
+    epochs = 100,
+    lr = 1e-3,
+    use_sampling_cube=False
+):
 
     os.makedirs(artifact_dir, exist_ok=True)
 
@@ -125,8 +130,8 @@ def train():
     num_classes = len(classes)
 
     # Datasets
-    train_set = SceneDataset(data_dir, "train", num_points)
-    val_set = SceneDataset(data_dir, "val", num_points)
+    train_set = SceneDataset(data_dir, "train", num_points, use_sampling_cube=use_sampling_cube)
+    val_set = SceneDataset(data_dir, "val", num_points, use_sampling_cube=use_sampling_cube)
 
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=batch_size)
