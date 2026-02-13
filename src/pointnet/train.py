@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-from model import PointNetSeg
+from .model import PointNetSeg
 
 
 # -------------------------------------------------
@@ -215,6 +215,3 @@ def train(
             best_val_acc = val_acc
             torch.save(checkpoint, os.path.join(artifact_dir, "best_model.pth"))
             print("Best model saved.")
-
-if __name__ == "__main__":
-    train()

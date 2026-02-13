@@ -5,8 +5,8 @@ from pathlib import Path
 import torch
 from sklearn.neighbors import NearestNeighbors
 
-from model import PointNetSeg
-from visualization import visualize_side_by_side
+from .model import PointNetSeg
+from .visualization import visualize_side_by_side
 
 
 # --------------------------------------------------
@@ -340,7 +340,3 @@ def evaluate(
     print(f"Overall Accuracy:     {overall_acc:.4f}")
     print(f"Mean Class Accuracy:  {mean_class_acc:.4f}")
     print(f"Mean IoU:             {mean_iou:.4f}")
-
-
-if __name__ == "__main__":
-    evaluate()

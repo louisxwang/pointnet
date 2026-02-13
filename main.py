@@ -1,5 +1,5 @@
-from pointnet.train import train
-from pointnet.eval import evaluate
+from src.pointnet.train import train
+from src.pointnet.eval import evaluate
 import argparse
 
 
@@ -7,23 +7,26 @@ def get_args():
     parser = argparse.ArgumentParser(
         description="Training/testing configuration for PointNet"
     )
-    parser.add_argument("--train", type=bool, action="store_true",
-        help="The script will do training"
+    parser.add_argument("--train", action="store_true",
+        help="Run training"
     )
-    parser.add_argument("--test", type=bool, action="store_true",
-        help="The script will do testing"
+    parser.add_argument("--test", action="store_true",
+        help="Run testing"
     )
     parser.add_argument("--data_dir", type=str, default="./data/input",
         help="Path to the input dataset directory"
+    )
+    parser.add_argument("--num_points", type=int, default=4096,
+        help="Model input size (number of points)"
+    )
+    parser.add_argument("--use_sampling_cube", action="store_true",
+        help="Experimental, sample points in a random positioned cube volume"
     )
     parser.add_argument("--artifact_dir", type=str, default="./artifacts",
         help="Train only: Directory to store checkpoints, logs, and outputs"
     )
     parser.add_argument("--batch_size", type=int, default=32,
         help="Train only: Batch size for training"
-    )
-    parser.add_argument("--num_points", type=int, default=4096,
-        help="Model input size (number of points)"
     )
     parser.add_argument("--epochs", type=int, default=100,
         help="Train only: Number of training epochs"
@@ -64,4 +67,3 @@ if __name__ == "__main__":
             num_classes =args.num_classes,
             use_sampling_cube=args.use_sampling_cube
             )
-
