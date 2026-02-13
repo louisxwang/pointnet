@@ -7,7 +7,12 @@ import torch
 from sklearn.neighbors import NearestNeighbors
 
 from .model import PointNetSeg
-from .visualization import visualize_side_by_side
+try:
+    from .visualization import visualize_side_by_side
+except:
+    print("Visualization dependencies not found, visualization will be disabled.")
+    def visualize_side_by_side(xyz, labels, preds, num_classes):    
+        pass
 
 
 # --------------------------------------------------
