@@ -8,56 +8,14 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
-
-# -------------------------------------------------
-# Model (RGB only input)
-# Small dataset, full model would overfit
-# Simplification are made by using less layers
-# -------------------------------------------------
-
-def block(in_c, out_c):
-    return nn.Sequential(
-        nn.Conv1d(in_c, out_c, 1),
-        nn.BatchNorm1d(out_c),
-        nn.ReLU()
-    )
-
-
-class PointNetSeg(nn.Module):
-    def __init__(self, num_classes):
-        super().__init__()
-
-        self.local_mlp = block(3, 64)
-        self.global_mlp = block(64, 1024)
-
-        self.head = nn.Sequential(
-            block(64 + 1024, 256),
-            nn.Dropout(0.5),
-            nn.Conv1d(256, num_classes, 1)
-        )
-
-    def forward(self, x):
-        B, N, _ = x.shape
-        x = x.transpose(1, 2)  # B x 3 x N
-
-        local_feat = self.local_mlp(x)
-        global_feat = self.global_mlp(local_feat)
-
-        global_feat = torch.max(global_feat, 2, keepdim=True)[0]
-        global_feat = global_feat.expand(-1, -1, N)
-
-        feat = torch.cat([local_feat, global_feat], dim=1)
-
-        out = self.head(feat)
-        return out.transpose(1, 2)
+from model import PointNetSeg
 
 
 # -------------------------------------------------
 # Dataset
 # -------------------------------------------------
-
 class SceneDataset(Dataset):
-    def __init__(self, root, split, num_points=4096, samples_per_scene=100):
+    def __init__(self, root, split, num_points=4096, samples_per_scene=64, normalize=False):
         self.root = Path(root).resolve()
         self.num_points = num_points
 
@@ -66,7 +24,21 @@ class SceneDataset(Dataset):
 
         self.scene_ids = splits[split]
         self.files = [self.root / f"scene_0{sid}.npz" for sid in self.scene_ids]
-        self.scenes = [np.load(f) for f in self.files]
+
+        if normalize:
+            self.scenes = []
+            for f in self.files:
+                data = np.load(f)
+                xyz = data["xyz"] # (N,3)
+                print(f"data mean {np.mean(xyz, 0)}")
+                print(f"data min max {np.min(xyz, axis=0)}, {np.max(xyz, axis=0)}")
+                xyz = xyz - xyz.mean(0)
+                xyz = xyz / (np.max(np.linalg.norm(xyz, axis=1))+ 1e-6)
+                self.scenes.append({"xyz":xyz, "labels":data["labels"]})
+                self.sampling_cube_size = 0.5  # Random sampling from a cube volume
+        else: # Normalization is not needed as all files are within [-5, 5] for x,y and [0, 2] for z
+            self.scenes = [np.load(f) for f in self.files]
+            self.sampling_cube_size = 2  # adjust to your scene scale
 
         # Multiple sampels from each file
         self.index_map = []
@@ -83,23 +55,48 @@ class SceneDataset(Dataset):
         xyz = data["xyz"]          # (N,3)
         labels = data["labels"]    # (N,)
 
-        # Normalize xyz (center + scale)
-        xyz = xyz - xyz.mean(0)
-        scale = np.max(np.linalg.norm(xyz, axis=1))
-        xyz = xyz / (scale + 1e-6)
+        # Random sampling from a cube volume
+        block_points = []
+        while len(block_points) < self.num_points:
+            # Pick random point as cube center
+            center_idx = np.random.choice(len(xyz))
+            center = xyz[center_idx]
 
-        # Random sampling
-        N = xyz.shape[0]
-        choice = np.random.choice(N, self.num_points, replace=N<self.num_points)
+            mask = (
+                (xyz[:, 0] > center[0] - self.sampling_cube_size/2) &
+                (xyz[:, 0] < center[0] + self.sampling_cube_size/2) &
+                (xyz[:, 1] > center[1] - self.sampling_cube_size/2) &
+                (xyz[:, 1] < center[1] + self.sampling_cube_size/2)
+            )
 
-        xyz = xyz[choice]
-        labels = labels[choice]
+            block_points = xyz[mask] - center
+            block_labels = labels[mask]
 
-        points = xyz + np.random.normal(0, 0.01, xyz.shape) 
+        choice = np.random.choice(
+            len(block_points),
+            self.num_points,
+            replace=False
+        )
 
+        block_points = block_points[choice]
+        block_labels = block_labels[choice]
+
+        # Random Z rotation, this avoids overfitting
+        theta = np.random.uniform(0, 2 * np.pi)
+        cosval = np.cos(theta)
+        sinval = np.sin(theta)
+
+        rotation_matrix = np.array([
+            [cosval, -sinval, 0],
+            [sinval,  cosval, 0],
+            [0,       0,      1]
+        ])
+
+        block_points = block_points @ rotation_matrix  
+        
         return (
-            torch.tensor(points, dtype=torch.float32),
-            torch.tensor(labels, dtype=torch.long),
+            torch.tensor(block_points, dtype=torch.float32),
+            torch.tensor(block_labels, dtype=torch.long),
         )
 
 
@@ -108,25 +105,28 @@ class SceneDataset(Dataset):
 # -------------------------------------------------
 
 def train():
-    root = "./data/input"
-    batch_size = 16
+    data_dir = "./data/input"
+    artifact_dir = "./artifacts"
+    batch_size = 32
     num_points = 4096
     epochs = 100
     lr = 1e-3
+
+    os.makedirs(artifact_dir, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
 
     # Classes
-    with open(os.path.join(root, "classes.json")) as f:
+    with open(os.path.join(data_dir, "classes.json")) as f:
         classes = json.load(f)
     print(f"Classes {classes}")
 
     num_classes = len(classes)
 
     # Datasets
-    train_set = SceneDataset(root, "train", num_points)
-    val_set = SceneDataset(root, "val", num_points)
+    train_set = SceneDataset(data_dir, "train", num_points)
+    val_set = SceneDataset(data_dir, "val", num_points)
 
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=batch_size)
@@ -136,6 +136,7 @@ def train():
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
 
+    best_val_acc = 0
     for epoch in range(epochs):
         model.train()
         total_loss = 0
@@ -192,6 +193,23 @@ def train():
             f"Val Acc {val_acc:.4f}"
         )
 
+        # ---- Checkpoint Saving ----
+        checkpoint = {
+            "epoch": epoch + 1,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "train_acc": train_acc,
+            "val_acc": val_acc,
+        }
+
+        # Save last checkpoint every epoch
+        torch.save(checkpoint, os.path.join(artifact_dir, "last_checkpoint.pth"))
+
+        # Save best model based on validation accuracy
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            torch.save(checkpoint, os.path.join(artifact_dir, "best_model.pth"))
+            print("Best model saved.")
 
 if __name__ == "__main__":
     train()

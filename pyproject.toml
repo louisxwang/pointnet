@@ -1,11 +1,15 @@
 [project]
 name = "pointnet"
 version = "0.1.0"
-description = "Add your description here"
+description = "Demo project for 3D point cloud segmentation"
+authors = [
+    { name = "Louis WANG", email = "louis.xiao.wang@gmail.com" }
+]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "matplotlib>=3.10.8",
     "open3d>=0.19.0",
     "torch>=2.10.0",
+    "tqdm>=4.67.3",
 ]
