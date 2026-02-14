@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from sklearn.metrics import confusion_matrix
 from sklearn.neighbors import NearestNeighbors
 
 from .model import PointNetSeg
@@ -318,6 +319,24 @@ def compute_metrics(preds, labels, num_classes):
     )
 
 
+def display_confusion_matrix(preds, labels, num_classes, class_names):
+    """
+    Display confusion matrix (rows=true, cols=pred), both raw and normalized.
+    """
+    cm = confusion_matrix(labels, preds, labels=np.arange(num_classes))
+    cm_norm = cm.astype(np.float64) / np.maximum(cm.sum(axis=1, keepdims=True), 1)
+
+    print("\nConfusion Matrix (rows=true, cols=pred):")
+    print("Classes:", ", ".join([f"{i}:{name}" for i, name in enumerate(class_names)]))
+    print(cm)
+
+    print("\nNormalized Confusion Matrix (by true class):")
+    print(np.array2string(
+        cm_norm,
+        formatter={"float_kind": lambda x: f"{x:0.3f}"}
+    ))
+
+
 # --------------------------------------------------
 # Evaluation function
 # --------------------------------------------------
@@ -383,3 +402,4 @@ def evaluate(
     print(f"Mean Class Accuracy:  {mean_class_acc:.4f}")
     print(f"Mean IoU:             {mean_iou:.4f}")
     print(f"Class IoUs:           {[f'{name}: {iou:.4f}' for name, iou in zip(class_names, ious) if iou is not None]}")
+    display_confusion_matrix(all_preds, all_labels, num_classes, class_names)
