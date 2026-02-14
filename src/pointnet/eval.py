@@ -289,11 +289,12 @@ def compute_metrics(preds, labels, num_classes):
         overall_acc: overall accuracy across all points
         mean_class_acc: mean accuracy across all classes
         mean_iou: mean IoU across all classes
+        ious: list of IoU for each class
     """
     overall_acc = (preds == labels).sum() / len(labels)
 
-    class_acc = []
-    ious = []
+    class_acc = [None] * num_classes
+    ious = [None] * num_classes
 
     for cls in range(num_classes):
         pred_mask = preds == cls
@@ -304,15 +305,16 @@ def compute_metrics(preds, labels, num_classes):
         total_label = np.sum(label_mask)
 
         if total_label > 0:
-            class_acc.append(intersection / total_label)
+            class_acc[cls] = intersection / total_label
 
         if union > 0:
-            ious.append(intersection / union)
+            ious[cls] = intersection / union
 
     return (
         overall_acc,
-        np.mean(class_acc),
-        np.mean(ious),
+        np.mean([acc for acc in class_acc if acc is not None]),
+        np.mean([iou for iou in ious if iou is not None]),
+        ious
     )
 
 
@@ -322,7 +324,6 @@ def compute_metrics(preds, labels, num_classes):
 def evaluate(
     data_dir = "./data/input",
     checkpoint_path = "./artifacts/best_model.pth",
-    num_classes = 5,
     visualize=True,
     use_sampling_cube = False
 ):
@@ -331,10 +332,18 @@ def evaluate(
     Params
         data_dir: folder containing scene_0x.npz and splits.json
         checkpoint_path: path to the trained model checkpoint
-        num_classes: how many classes does the model support
         visualize: whether to visualize predictions vs ground truth
         use_sampling_cube: whether to use sliding window inference or whole scene inference
     """     
+    # Load class names and determine num_classes
+    class_names = []
+    with open(os.path.join(data_dir, "classes.json")) as f:
+        classes = json.load(f)
+        num_classes = len(classes)
+        for i in range(num_classes):
+            class_names.append(classes[str(i)])
+
+    # Load model checkpoint
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device {device}")
 
@@ -360,15 +369,17 @@ def evaluate(
         all_preds.append(preds)
         all_labels.append(labels)
 
+        if visualize:
+            visualize_side_by_side(xyz, labels, preds, num_classes)
+
     all_preds = np.concatenate(all_preds)
     all_labels = np.concatenate(all_labels)
 
-    if visualize:
-        visualize_side_by_side(xyz, labels, preds, num_classes)
 
-    overall_acc, mean_class_acc, mean_iou = \
+    overall_acc, mean_class_acc, mean_iou, ious = \
         compute_metrics(all_preds, all_labels, num_classes)
 
     print(f"Overall Accuracy:     {overall_acc:.4f}")
     print(f"Mean Class Accuracy:  {mean_class_acc:.4f}")
     print(f"Mean IoU:             {mean_iou:.4f}")
+    print(f"Class IoUs:           {[f'{name}: {iou:.4f}' for name, iou in zip(class_names, ious) if iou is not None]}")

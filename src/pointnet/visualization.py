@@ -8,7 +8,7 @@ def labels_to_colors(labels, num_classes):
     """
 
     color_map = np.array([
-        [0.00, 0.45, 0.85],  # Class 0 - Blue
+        [0.00, 0.00, 0.00],  # Class 0 - Black
         [0.85, 0.10, 0.10],  # Class 1 - Red
         [0.10, 0.70, 0.20],  # Class 2 - Green
         [0.95, 0.85, 0.10],  # Class 3 - Yellow

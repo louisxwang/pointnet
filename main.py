@@ -45,9 +45,6 @@ def get_args():
     parser.add_argument("--checkpoint_path", type=str, default="./artifacts/best_model.pth",
         help="Test only: Where to load the model for test"
     )
-    parser.add_argument("--num_classes", type=int, default=5,
-        help="Test only: Number of classes supported by the model"
-    )
 
     return parser.parse_args()
 
@@ -72,6 +69,5 @@ if __name__ == "__main__":
         evaluate(
             data_dir =args.data_dir,
             checkpoint_path =args.checkpoint_path,
-            num_classes =args.num_classes,
             use_sampling_cube=args.use_sampling_cube
             )
